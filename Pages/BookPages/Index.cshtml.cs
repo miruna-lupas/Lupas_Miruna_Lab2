@@ -17,10 +17,13 @@ namespace Lupas_Miruna_Lab2.Pages.BookPages
         public IList<Book> Book { get; set; } = default!;
 
         public async Task OnGetAsync()
-        {
+        { 
             Book = await _context.Book
-                .Include(b => b.Author)
                 .Include(b => b.Publisher)
+                .Include(b => b.Author)
+                .Include(b => b.BookCategories!)
+                .ThenInclude(b => b.Category)
+                .AsNoTracking()
                 .ToListAsync();
         }
     }

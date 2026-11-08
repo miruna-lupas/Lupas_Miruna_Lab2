@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Lupas_Miruna_Lab2.Data;
@@ -7,7 +6,7 @@ using Lupas_Miruna_Lab2.Models;
 
 namespace Lupas_Miruna_Lab2.Pages.BookPages
 {
-    public class EditModel : PageModel
+    public class EditModel : BookCategoriesPageModel
     {
         private readonly Lupas_Miruna_Lab2Context _context;
 
@@ -16,8 +15,7 @@ namespace Lupas_Miruna_Lab2.Pages.BookPages
             _context = context;
         }
 
-        [BindProperty]
-        public Book Book { get; set; } = default!;
+        [BindProperty] public Book Book { get; set; } = default!;
 
         public async Task<IActionResult> OnGetAsync(int? id)
         {
@@ -26,45 +24,102 @@ namespace Lupas_Miruna_Lab2.Pages.BookPages
                 return NotFound();
             }
 
-            var book =  await _context.Book.FirstOrDefaultAsync(m => m.ID == id);
-            if (book == null)
+            Book = await _context.Book
+                .Include(b => b.Publisher)
+                .Include(b => b.Author)
+                .Include(b => b.BookCategories).ThenInclude(b => b.Category)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ID == id);
+
+            if (Book == null)
             {
                 return NotFound();
             }
-            Book = book;
+
+            PopulateAssignedCategoryData(_context, Book);
+
             ViewData["AuthorID"] = new SelectList(_context.Author, "ID", "FullName");
             ViewData["PublisherID"] = new SelectList(_context.Publisher, "ID", "PublisherName");
             return Page();
         }
 
-        public async Task<IActionResult> OnPostAsync()
+
+        public async Task<IActionResult> OnPostAsync(int? id, string[] selectedCategories)
         {
-            if (!ModelState.IsValid)
+            if (id == null)
             {
-                ViewData["AuthorID"] = new SelectList(_context.Author, "ID", "FullName");
-                ViewData["PublisherID"] = new SelectList(_context.Publisher, "ID", "PublisherName");
-                return Page();
+                return NotFound();
             }
 
-            _context.Attach(Book).State = EntityState.Modified;
+            var bookToUpdate = await _context.Book
+                .Include(b => b.Publisher)
+                .Include(b => b.Author)
+                .Include(b => b.BookCategories!)
+                .ThenInclude(b => b.Category)
+                .FirstOrDefaultAsync(s => s.ID == id);
 
-            try
+            if (bookToUpdate == null)
             {
+                return NotFound();
+            }
+
+            if (await TryUpdateModelAsync<Book>(
+                    bookToUpdate,
+                    "Book",
+                    i => i.Title, i => i.AuthorID,
+                    i => i.Price, i => i.PublishingDate, i => i.PublisherID))
+            {
+                UpdateBookCategories(_context, selectedCategories, bookToUpdate);
                 await _context.SaveChangesAsync();
+                return RedirectToPage("./Index");
             }
-            catch (DbUpdateConcurrencyException)
+
+            UpdateBookCategories(_context, selectedCategories, bookToUpdate);
+            PopulateAssignedCategoryData(_context, bookToUpdate);
+            ViewData["AuthorID"] = new SelectList(_context.Author, "ID", "FullName");
+            ViewData["PublisherID"] = new SelectList(_context.Publisher, "ID", "PublisherName");
+            return Page();
+        }
+
+        public void UpdateBookCategories(Lupas_Miruna_Lab2Context context, string[] selectedCategories,
+            Book bookToUpdate)
+        {
+            if (selectedCategories == null)
             {
-                if (!BookExists(Book.ID))
+                bookToUpdate.BookCategories = new List<BookCategory>();
+                return;
+            }
+
+            var selectedCategoriesHS = new HashSet<string>(selectedCategories);
+            var bookCategories = new HashSet<int>
+                (bookToUpdate.BookCategories.Select(c => c.Category.ID));
+
+            foreach (var cat in context.Category)
+            {
+                if (selectedCategoriesHS.Contains(cat.ID.ToString()))
                 {
-                    return NotFound();
+                    if (!bookCategories.Contains(cat.ID))
+                    {
+                        bookToUpdate.BookCategories.Add(new BookCategory
+                        {
+                            BookID = bookToUpdate.ID,
+                            CategoryID = cat.ID
+                        });
+                    }
                 }
                 else
                 {
-                    throw;
+                    if (bookCategories.Contains(cat.ID))
+                    {
+                        BookCategory? courseToRemove =
+                            bookToUpdate.BookCategories.SingleOrDefault(i => i.CategoryID == cat.ID);
+                        if (courseToRemove != null)
+                        {
+                            context.Remove(courseToRemove);
+                        }
+                    }
                 }
             }
-
-            return RedirectToPage("./Index");
         }
 
         private bool BookExists(int id)
