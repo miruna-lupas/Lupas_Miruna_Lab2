@@ -15,5 +15,9 @@ namespace Lupas_Miruna_Lab2.Data
         public DbSet<Publisher> Publisher { get; set; } = default!;
         
         public DbSet<Author> Author { get; set; } = default!;
+        
+        public DbSet<Category> Category { get; set; } = default!;
+        
+        public DbSet<BookCategory> BookCategory { get; set; } = default!;
     }
 }
