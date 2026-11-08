@@ -7,9 +7,11 @@ namespace Lupas_Miruna_Lab2.Models
         public int ID { get; set; }
         
         [Display(Name = "First Name")]
+        [StringLength(1000)]
         public string FirstName { get; set; } = string.Empty;
 
         [Display(Name = "Last Name")]
+        [StringLength(100)]
         public string LastName { get; set; } = string.Empty;
 
         [Display(Name = "Full Name")]

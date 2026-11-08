@@ -8,6 +8,7 @@ namespace Lupas_Miruna_Lab2.Models
         public int ID { get; set; }
 
         [Display(Name = "Book Title")]
+        [StringLength(100)]
         public string Title { get; set; } = string.Empty;
 
         [Column(TypeName = "decimal(6, 2)")]
